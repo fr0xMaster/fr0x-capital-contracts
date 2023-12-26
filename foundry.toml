@@ -7,7 +7,7 @@ remappings = [
     '@uniswap-core/=lib/v2-core/',
     '@uniswap-periphery/=lib/v2-periphery/',
 ]
-solc = "0.8.19"
+solc = "0.8.20"
 optimizer = true
 optimizer_runs = 1000
 gas_reports = ["*"]
