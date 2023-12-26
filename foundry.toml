@@ -2,6 +2,11 @@
 src = 'src'
 out = 'out'
 libs = ['lib']
+remappings = [
+    '@openzeppelin/=lib/openzeppelin-contracts/',
+    '@uniswap-core/=lib/v2-core/',
+    '@uniswap-periphery/=lib/v2-periphery/',
+]
 solc = "0.8.19"
 optimizer = true
 optimizer_runs = 1000
