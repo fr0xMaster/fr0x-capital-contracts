@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/* 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IUniswapV2Factory} from "@uniswap-core/contracts/interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "@uniswap-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
-contract BBSToken is ERC20, Ownable {
+contract Fr0x is ERC20, Ownable {
     IUniswapV2Router02 private _uniswapV2Router = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29); //Spookyswap Router
     address private _uniswapV2Pair;
 
@@ -24,43 +25,6 @@ contract BBSToken is ERC20, Ownable {
     uint256 private _tokensForFee;
     address public _feeAddr;
 
-    // Trade Farmer Fees
-    uint256 private _tokensForFarm;
-    mapping(address => bool) public liquidityPools; // Add all liquidity pools that will support farming slots
-    mapping(address => uint256) public farmingLeaderboard; // Keep track of each farmers rewards for dashboard
-    address[] public farmingLUT; //Look up table to fetch all farmers in leaderboard
-    address[] public farmers = [
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD,
-        0x000000000000000000000000000000000000dEaD
-    ]; // Set first 15 farmers to dead address
-    uint256[] farmerWeight = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
-    uint256[] farmerPayout = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    uint256 public farmerFees = 3;
-    uint256 private totalWeights = 40;
-    uint256 public minFarmAmt = 1000 * (10 ** 18); // How many traders need to swap to get on farming slot
-    uint256 public farmerCount = 0;
-    bool public liquidityDeposited = false;
-
-    uint256 public burnedSupply = 0;
-
     mapping(address => bool) public farmingDenyList;
 
     mapping(address => bool) private _whitelisted;
@@ -71,7 +35,7 @@ contract BBSToken is ERC20, Ownable {
         _;
     }
 
-    constructor(address feeAddr) payable ERC20("BatmanBinSuparman", "BBS") {
+    constructor(address feeAddr) payable ERC20("fr0xCapital", "fr0x") {
         uint256 totalSupply = 100000000000 * (10 ** 18);
         uint256 totalLiquidity = totalSupply * 90 / 100; // 90%
 
@@ -302,3 +266,5 @@ contract BBSToken is ERC20, Ownable {
 
     receive() external payable {}
 }
+
+*/

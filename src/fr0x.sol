@@ -1,356 +1,335 @@
 // SPDX-License-Identifier: MIT
+/* solhint-disable var-name-mixedcase */
+/* solhint-disable func-name-mixedcase */
+/* solhint-disable  private-vars-leading-underscore */
 pragma solidity ^0.8.20;
-/*
 
-pragma solidity ^0.8.20;
-
+/**
+ * fr0x Capital ($fr0x)
+ * Website: https://fr0x.capital
+ * Telegram: https://t.me/fr0xCapital
+ * Twitter: https://twitter.com/fr0xCapital
+ * ....................................................................................................
+ * .........................................''''''''''''''''''''.......................................
+ * ..................................''''''''''''''''''''''''''''''''''................................
+ * ..............................''''''''',,,,,,,,,,,,,,,,,,,,,,,''''''''''............................
+ * ...........................''''''',,,,,,,,,;;;;;;;;;;;;;;,,,,,,,,,,''''''''.........................
+ * .........................'''''',,,,,;;;::cccllllllllllllllcc:::;;;,,,,,''''''.......................
+ * ........................''''',,,;;:ldxO0KXXXXXNNNNNNNNNNXXXXKK0Okxol:;,,,'''''......................
+ * ......................''''',,,;cokKXWMMMMMMMMMMMMMMMMMMMMMMMMMMMMWWX0xl;,,,''''.....................
+ * ......................'''',,;cxKNWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMWXxc;,,''''....................
+ * .....................'''',,;ckWMMMMMMMWNXKK000000000OOOOOOOOOOO0KNWMMMMWOc;,,''''...................
+ * ....................''''',,;oKMMMMMWN0xolcccccccc:cccc:::::::::ccoxOXWMMNk:,,,''''..................
+ * ....................'''',,,:xNMMMN0xoc::::::::::::ccc:::::::;;;:::::oOWMMKl;,,''''..................
+ * ....................'''',,;:kNMMNkc::::::;:::::cdO000Oxc:;;;;;;;;;;;:l0WMXd;,,''''..................
+ * ....................'''',,,:xNMWKo::;;;:;;;;;;:xNMMMMMXd:;;;;;;;;;;;;ckWMNd;,,''''..................
+ * ....................'''',,,;oXMMKo::;;;;;;;;;;:dKWWWWWKo:;;;;;;;;;;;;:kNWKo;,,''''..................
+ * ....................''''',,;ckNMW0o::;;;;;;;;;;:lxkkxdl:;;;;;;;;;;;;;cOWNk:,,'''''..................
+ * ....................''''',,,;ckNMWXkl::;;;;;;;;;;;;;;;;;;;;;;;;;;;;;cxXNOc;,,'''''..................
+ * .....................'''',,,,;:d0NWWX0xolc:::::::::::;;;;;;;;:::cldkKXKd:;,,,'''''..................
+ * .....................''''',,,,;;cok0XNNNXK0OOOOOOOOOOkkkkkkkOO0KKKK0koc;,,,,,''''...................
+ * .....................''''',,,,,,;;;:codxxkkOOO0000000000OOOOkkxxdlc:;;;,,,,,'''''...................
+ * .....................''''',,,;;;;;;;;;;;;;;::::::::::::::;;;;;;;;;;;;;,,,,,,'''''...................
+ * .....................''''',;dkxl:;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:ldo:,'''''...................
+ * .....................''''',c0WWN0xl:;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:clx0XWXo,,''''...................
+ * .....................''''',;dKWMMWX0dl:;;;;;;;;;;;;;;;;;;;;;;;;:cok0NWMMWKo,'''''...................
+ * ......................''''',;cdOXNWMWXOdc::;;;;;;;;;;;;;;;:::ldkKNWMMWNKkl;,'''''...................
+ * ......................'''''',,,;cok0NWWNKkdc::;;::;;;::::coxOXWMMMWNKko:;,,'''''....................
+ * .......................'''''',,,,;;:lx0NWWNKOdlc:::::cldOKNWMMMWX0xo:;;,,,'''''.....................
+ * ........................''''',,,,,;;;:cokKNWWNKOxdodk0XWMMMMWXOxl::;;,,,,,'''''.....................
+ * ........................'''''',,,,;;;;:::ldOXWMMWNNWWMMMWNKOdlc:;;;;,,,,''''''......................
+ * .........................''''',,,,;;;;;::ccoONMMMMMMMMMWKxlc::::;;;;,,,,'''''.......................
+ * ........................'''''',,,,;;;::cox0XWMMMMWWWMMMWNKOdl:::;;;;,,,,'''''.......................
+ * ........................''''',,,,;;:cok0NWMMMWNKOxxxOKNWMMWNKOdl:;;;,,,,'''''.......................
+ * ........................'''',,,,;ldOKNWMMMWX0koc:::::clxOKNWMMWXOxl:;,,,''''''......................
+ * .......................'''',,;cdOXWMMMWNKOdl::;;;;;;;;;;:coxOKNWMWX0xl:,,,'''''.....................
+ * .......................''',:dOXWMMMWNKkoc:;;;;,,,,,,,,,,,;;;:cokKNWMWX0xl:,''''.....................
+ * .......................''',lKWMMWN0ko:;;,,,,,,,,,,,,,,,,,,,,,,,;:ox0NWMWN0l,'''.....................
+ * ........................'',lKWXOxl:;,,,,,,,''''''''''''''''',,,,,,;:lkKNWWk;''......................
+ * ........................''';lo:;,,,''''''''''''''''''''''''''''''''',,:lxxl,'.......................
+ * ..........................'''''''''''''''''''............'''''''''''''''''''........................
+ * ................................''''''.........................'''''''..............................
+ * ....................................................................................................
+ */
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {IUniswapV2Factory} from "@uniswap-core/contracts/interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "@uniswap-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 contract Fr0x is ERC20, Ownable {
-    uint256 public MAX_WALLET;
-    address public PAIR;
-    IUniswapV2Router02 immutable ROUTER = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29);
-    uint256 SUPPLY = 100_000_000 * 10 ** 18;
-    uint256 TOTAL_FEE = 5;
-    bool private _isSwapping;
-    address public MARKETING_DEV;
+    uint256 public constant TOTAL_SUPPLY = 10_000_000_000 * 1e18;
+
+    IUniswapV2Router02 public immutable uniswapV2Router;
+    address public uniswapV2Pair;
+    uint256 public tradeLimit;
+    uint256 public walletLimit;
+    uint256 public feeSwapThreshold;
+    bool public tradingEnabled;
+    bool public transferDelayEnabled = true;
+    bool public limitsEnabled = true;
+
+    uint256 public SELL_FEE = 500; // 5%
+    uint256 public BUY_FEE = 500; // 5%
+
     address public TREASURY;
-    uint256 public MARKETING_DEV_FEE;
-    uint256 public TREASURY_FEE;
-    address immutable WFTM = 0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83;
+    address public MARKETING_DEV;
+    bool private _isSwapping;
 
     mapping(address => bool) public pools;
-    mapping(address => bool) internal _exemptFromLimits;
-    mapping(address => bool) internal _exemptFromFees;
+    mapping(address => bool) public exemptFromLimitsAndFee;
 
-    constructor(address _MARKETING_DEV, address _TREASURY) ERC20("fr0xCapital", "fr0x") Ownable(msg.sender) {
-        _mint(msg.sender, SUPPLY);
-        MAX_WALLET = (SUPPLY * 2) / 100; //2%
-        MARKETING_DEV = _MARKETING_DEV;
-        TREASURY = _TREASURY;
-        PAIR = IUniswapV2Factory(ROUTER.factory()).createPair(address(this), ROUTER.WETH());
-        _approve(address(this), address(ROUTER), SUPPLY);
-        IERC20(PAIR).approve(address(ROUTER), type(uint256).max);
-        pools[address(PAIR)] = true;
-        _exemptFromLimits[address(PAIR)] = true;
+    // EVENTS
+    event FeeExemption(address indexed account, bool isExempt);
+    event PoolUpdate(address indexed pair, bool indexed value);
+
+    // ERRORS
+    error NotEnoughBalanceToOpenTrading();
+
+    error CannotRemoveDefaultPair();
+    error MaximumFee();
+    error MinimumLimit();
+    error MinimumSwapThreshold();
+    error MaximumSwapThreshold();
+    error TradingDisabled();
+    error AlreadyInitialized();
+    error BlockTransferLimit();
+    error TradeLimitExceeded();
+    error WalletLimitExceeded();
+
+    constructor(address _treasury, address _marketingDev) ERC20("fr0xCapital", "fr0x") {
+        uniswapV2Router = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29); //SpookySwap Router
+        tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 200); // 2%
+        walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 200); // 2%
+        feeSwapThreshold = _applyBasisPoints(TOTAL_SUPPLY, 5); // 0.05%
+
+        TREASURY = _treasury;
+        MARKETING_DEV = _marketingDev;
+
+        exemptFromLimitsAndFee[address(uniswapV2Router)] = true;
+        exemptFromLimitsAndFee[owner()] = true;
+        exemptFromLimitsAndFee[TREASURY] = true;
+        exemptFromLimitsAndFee[MARKETING_DEV] = true;
+        exemptFromLimitsAndFee[address(this)] = true;
+        _mint(address(this), TOTAL_SUPPLY);
+    }
+
+    function openTrading(address _lpOwner) external payable onlyOwner {
+        if (tradingEnabled) revert AlreadyInitialized();
+        require(msg.value == 1000 ether, "Need 1000 FTM to Open Trading");
+        _approve(address(this), address(uniswapV2Router), TOTAL_SUPPLY);
+        uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory()).createPair(address(this), uniswapV2Router.WETH());
+        IERC20(uniswapV2Pair).approve(address(uniswapV2Router), type(uint256).max);
+        pools[address(uniswapV2Pair)] = true;
+        exemptFromLimitsAndFee[address(uniswapV2Pair)] = true;
+        uniswapV2Router.addLiquidityETH{value: address(this).balance}(
+            address(this), balanceOf(address(this)), 0, 0, _lpOwner, block.timestamp
+        );
+        tradingEnabled = true;
     }
 
     receive() external payable {}
 
+    function _applyBasisPoints(uint256 amount, uint256 basisPoints) internal pure returns (uint256) {
+        return (amount * basisPoints) / 10_000;
+    }
+
+    /*
+    // --------------
+    // TRANSFER
+
     function _transfer(address from, address to, uint256 amount) internal override {
-        _checkWalletLimit(to, amount);
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        if (amount == 0) {
+            super._transfer(from, to, 0);
+            return;
+        }
+
+        _handleLimits(from, to, amount);
         uint256 finalAmount = _chargeFees(from, to, amount);
         _handleFeeSwap(from, to);
+
         super._transfer(from, to, finalAmount);
     }
 
-    function _checkWalletLimit(address _to, uint256 amount) internal view {
-        if (_to != owner() && _to != address(this) && _to != address(0) && _to != PAIR) {
-            require((balanceOf(_to) + amount) <= MAX_WALLET, "Can't hold more than max allet");
+    // --------------
+    // LIMITS
+
+    function _handleLimits(address from, address to, uint256 amount) internal {
+        if (!limitsEnabled || _isSwapping || from == owner() || to == owner()) {
+            return;
+        }
+
+        if (!tradingEnabled && !_exemptFromLimits[from] && !_exemptFromLimits[to]) {
+            revert TradingDisabled();
+        }
+
+        _applyLimits(from, to, amount);
+    }
+
+    
+
+    /// @dev Apply trade and balance limits
+    function _applyLimits(address from, address to, uint256 amount) internal view {
+        // buy
+        if (pools[from] && !_exemptFromLimits[to]) {
+            if (amount > tradeLimit) revert TradeLimitExceeded();
+            if (amount + balanceOf(to) > walletLimit) revert WalletLimitExceeded();
+        }
+        // sell
+        else if (pools[to] && !_exemptFromLimits[from]) {
+            if (amount > tradeLimit) revert TradeLimitExceeded();
+        }
+        // transfer
+        else if (!_exemptFromLimits[to]) {
+            if (amount + balanceOf(to) > walletLimit) revert WalletLimitExceeded();
         }
     }
 
+    // --------------
+    // FEES
+
     function _chargeFees(address from, address to, uint256 amount) internal returns (uint256) {
-        if (_isSwapping) {
+        if (_isSwapping || _exemptFromFees[from] || _exemptFromFees[to]) {
             return amount;
-        } else {
-            uint256 fee = (amount * TOTAL_FEE) / 100;
-            super._transfer(from, address(this), fee);
-            return amount - fee;
         }
+
+        uint256 fees = 0;
+        if (pools[to] && sellFee > 0) {
+            fees = _applyBasisPoints(amount, sellFee);
+        } else if (pools[from] && buyFee > 0) {
+            fees = _applyBasisPoints(amount, buyFee);
+        }
+
+        if (fees > 0) {
+            super._transfer(from, address(this), fees);
+        }
+
+        return amount - fees;
     }
 
     /// @dev swaps and distributes accumulated fees
     function _handleFeeSwap(address from, address to) internal {
+        bool canSwap = balanceOf(address(this)) >= feeSwapThreshold;
+
         // non-exempt sellers trigger fee swaps
-        if (!_isSwapping && !pools[from] && pools[to] && !_exemptFromFees[from]) {
+        if (canSwap && !_isSwapping && !pools[from] && pools[to] && !_exemptFromFees[from]) {
             _isSwapping = true;
-            //_swapAndDistributeFees();
+            _swapAndDistributeFees();
             _isSwapping = false;
         }
     }
-}
- */
 
-/*
-contract OTSeaERC20 is Ownable, ERC20 {
+    function _swapAndDistributeFees() internal {
+        uint256 contractBalance = balanceOf(address(this));
 
-
-
-    function _transfer(address from, address to, uint256 amount) internal override {
-        if (PAIR == address(0)) {
-            require(
-                from == address(this) || from == address(0) || from == owner() || to == owner(),
-                "Not started"
-            );
-            super._transfer(from, to, amount);
+        if (contractBalance == 0) {
             return;
         }
 
-        if (
-            from == PAIR && to != address(this) && to != owner() && to != address(router)
-        ) {
-            require(super.balanceOf(to) + amount <= maxWallet, "max wallet");
+        if (contractBalance > feeSwapThreshold * 20) {
+            contractBalance = feeSwapThreshold * 20;
         }
 
-        uint256 swapAmount = balanceOf(address(this));
+        _swapTokensForEth(contractBalance);
 
-        if (swapAmount > swapAt) {
-            swapAmount = swapAt;
-        }
-
-        if (swapAt > 0 && swapAmount == swapAt && !inSwap && from != PAIR) {
-            inSwap = true;
-
-            swapTokensForEth(swapAmount);
-
-            uint256 balance = address(this).balance;
-
-            if (balance > 0) {
-                withdraw(balance);
-            }
-
-            inSwap = false;
-        }
-
-        uint256 fee;
-
-        if (block.number <= openTradingBlock + 4 && from == PAIR) {
-            require(!isContract(to));
-            fee = snipeFee;
-        } else if (totalFee > 0) {
-            fee = totalFee;
-        }
-
-        if (fee > 0 && from != address(this) && from != owner() && from != address(router)) {
-            uint256 feeTokens = (amount * fee) / 100;
-            amount -= feeTokens;
-
-            super._transfer(from, address(this), feeTokens);
-        }
-        super._transfer(from, to, amount);
-
+        (bool sent,) = _teamWallet.call{value: address(this).balance}("");
+        require(sent, "send failed");
     }
 
-    function swapTokensForEth(uint256 tokenAmount) private {
+    // --------------
+    // ADMIN
+
+    function removeLimits() external onlyOwner {
+        limitsEnabled = false;
+    }
+
+    function disableTransferDelay() external onlyOwner {
+        transferDelayEnabled = false;
+    }
+
+    /// @notice Set swap size limit to `amount` tokens (in token units)
+    function setTradeLimit(uint256 amount) external onlyOwner {
+        // minimim 0.1% of supply
+        amount *= 1e18;
+        if (amount < _applyBasisPoints(TOTAL_SUPPLY, 10)) revert MinimumLimit();
+        tradeLimit = amount;
+    }
+
+    /// @notice Set wallet balance limit to `amount` tokens (in token units)
+    function setWalletLimit(uint256 amount) external onlyOwner {
+        // minimim 0.1% of supply
+        amount *= 1e18;
+        if (amount < _applyBasisPoints(TOTAL_SUPPLY, 10)) revert MinimumLimit();
+        walletLimit = amount;
+    }
+
+    function setExemptFromFees(address addr, bool exempt) external onlyOwner {
+        _exemptFromFees[addr] = exempt;
+        emit FeeExemption(addr, exempt);
+    }
+
+    function setExemptFromLimits(address addr, bool exempt) external onlyOwner {
+        _exemptFromLimits[addr] = exempt;
+    }
+
+    /// Set buy fee in basis points
+    function setBuyFee(uint256 fee) external onlyOwner {
+        if (fee > 500) revert MaximumFee(); // 5%
+        buyFee = fee;
+    }
+
+    /// Set sell fee in basis points
+    function setSellFee(uint256 fee) external onlyOwner {
+        if (fee > 500) revert MaximumFee(); // 5%
+        sellFee = fee;
+    }
+
+    function setPool(address pool, bool value) external onlyOwner {
+        if (pool == uniswapV2Pair) revert CannotRemoveDefaultPair();
+        _setPool(pool, value);
+    }
+
+    function _setPool(address pool, bool value) private {
+        pools[pool] = value;
+        emit PoolUpdate(pool, value);
+    }
+
+    /// @notice Set fee swap threshold to `basisPoints` as a fraction of total supply
+    /// Set to 10000 to disable fee swaps
+    function setFeeSwapThreshold(uint256 basisPoints) external onlyOwner {
+        if (basisPoints < 1) revert MinimumSwapThreshold();
+        if (basisPoints > 10_000) revert MaximumSwapThreshold();
+        feeSwapThreshold = _applyBasisPoints(TOTAL_SUPPLY, basisPoints);
+    }
+
+    function setTeamWallet(address addr) external onlyOwner {
+        _teamWallet = payable(addr);
+    }
+
+    // --------------
+    // HELPERS
+
+
+    function _swapTokensForEth(uint256 tokenAmount) private {
+        // generate the uniswap pair path of token -> weth
         address[] memory path = new address[](2);
         path[0] = address(this);
-        path[1] = router.WETH();
-        _approve(address(this), address(router), tokenAmount);
+        path[1] = uniswapV2Router.WETH();
 
-        router.swapExactTokensForETHSupportingFeeOnTransferTokens(
+        _approve(address(this), address(uniswapV2Router), tokenAmount);
+
+        // make the swap
+        uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
             tokenAmount,
-            0,
+            0, // accept any amount of ETH
             path,
             address(this),
             block.timestamp
         );
     }
-
-    function sendFunds(address user, uint256 value) private {
-        if (value > 0) {
-            (bool success, ) = user.call{value: value}("");
-            success;
-        }
-    }
-
-    function withdraw(uint256 amount) private {
-        uint256 toDividends = amount / 5;
-        uint256 toOp1 = amount / 10;
-        uint256 toOp2 = amount / 10;
-        uint256 toMarketing = amount - toDividends - toOp1 - toOp2;
-
-        sendFunds(opWallet1, toOp1);
-        sendFunds(opWallet2, toOp2);
-        sendFunds(marketingWallet, toMarketing);
-    }
-
- 
-
-    function setMarketingWallet(address payable _marketingWallet) external {
-        require(msg.sender == marketingWallet, "Not authorized");
-        marketingWallet = _marketingWallet;
-    }
-
-    function setOpWallet1(address payable _opWallet1) external {
-        require(msg.sender == opWallet1, "Not authorized");
-        opWallet1 = _opWallet1;
-    }
-
-    function setOpWallet2(address payable _opWallet2) external {
-        require(msg.sender == opWallet2, "Not authorized");
-        opWallet2 = _opWallet2;
-    }
+    */
 }
- */
-
-/*
-
-contract ConkInu is ERC20, Ownable {
-    using SafeERC20 for IERC20;
-    using Address for address payable;
-
-    bool public inSwap;
-    modifier swapping() {
-        inSwap = true;
-        _;
-        inSwap = false;
-    }
-
-    mapping(address => bool) public isFeeExempt;
-    mapping(address => bool) public canAddLiquidityBeforeLaunch;
-
-    uint256 public maxWallet;
-    uint256 private marketingFee;
-    uint256 private totalFee;
-    uint256 public feeDenominator = 10000;
-
-    uint256 public totalFeeBuy = 300;
-    uint256 public totalFeeSell = 500;
-
-    // Fees receivers
-    address payable private marketingWallet = payable(0x7D8e6591B128FC284D1245B7F61f8307d96844B2);
-
-    IROUTER02 private immutable swapRouter = IROUTER02(0xF491e7B69E4244ad4002BC14e878a34207E38c29);
-    IWFTM private immutable WFTM = IWFTM(0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83);
-    address private constant DEAD = 0x000000000000000000000000000000000000dEaD;
-    address private constant ZERO = 0x0000000000000000000000000000000000000000;
-    
-    address public pair;
-
-    constructor() ERC20("ConkInu", "CONKI"){
-        uint256 _totalSupply = 1_000_000_000_000 * 1e18;
-        maxWallet = (_totalSupply * 5) / 100; //5%
-
-        canAddLiquidityBeforeLaunch[_msgSender()] = true;
-        canAddLiquidityBeforeLaunch[address(this)] = true;
-        isFeeExempt[msg.sender] = true;
-        isFeeExempt[address(this)] = true;
-        isFeeExempt[marketingWallet] = true;
-
-        _mint(_msgSender(), _totalSupply);
-    }
-
-    receive() external payable {}
-
-    function transfer(address to, uint256 amount) public virtual override returns (bool) {
-        return _conkInuTransfer(_msgSender(), to, amount);
-    }
-
-    function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
-        address spender = _msgSender();
-        _spendAllowance(sender, spender, amount);
-        return _conkInuTransfer(sender, recipient, amount);
-    }
-
-    function _conkInuTransfer(address sender, address recipient, uint256 amount) internal returns (bool) {
-        if (inSwap) {
-            _transfer(sender, recipient, amount);
-            return true;
-        }
-        checkWalletLimit(recipient, amount);
-
-        // Set Fees
-        if (sender == pair) {
-            buyFees();
-        }
-        if (recipient == pair) {
-            sellFees();
-        }
-        if (shouldSwapBack()) {
-            swapBack();
-        }
-        uint256 amountReceived = shouldTakeFee(sender, recipient) ? takeFee(sender, amount) : amount;
-        _transfer(sender, recipient, amountReceived);
-
-        return true;
-    }
-
-    // Internal Functions
-    function shouldSwapBack() internal view returns (bool) {
-        return !inSwap && balanceOf(address(this)) > 0 && _msgSender() != pair;
-    }
-
-    function swapBack() internal swapping {
-        uint256 taxAmount = balanceOf(address(this));
-        _approve(address(this), address(swapRouter), taxAmount);
-
-        address[] memory path = new address[](2);
-        path[0] = address(this);
-        path[1] = address(WFTM);
-
-        swapRouter.swapExactTokensForETHSupportingFeeOnTransferTokens(taxAmount, 0, path, address(this), block.timestamp);
-
-        uint256 amountETH = address(this).balance;
-        uint256 amountETHMarketing = (amountETH * marketingFee) / totalFee;
-
-        marketingWallet.sendValue(amountETHMarketing);
-    }
-
-    function buyFees() internal {
-        marketingFee = totalFeeBuy;
-        totalFee = marketingFee;
-    }
-
-    function sellFees() internal {
-        marketingFee = totalFeeSell;
-        totalFee = marketingFee;
-    }
-
-    function shouldTakeFee(address sender, address recipient) internal view returns (bool) {
-        return !isFeeExempt[sender] && !isFeeExempt[recipient];
-    }
-
-    function takeFee(address sender, uint256 amount) internal returns (uint256) {
-        uint256 feeAmount = (amount * totalFee) / feeDenominator;
-        _transfer(sender, address(this), feeAmount);
-        return amount - feeAmount;
-    }
-
-    function checkWalletLimit(address recipient, uint256 amount) internal view {
-        if (recipient != owner() && recipient != address(this) && recipient != address(DEAD) && recipient != pair) {
-            uint256 heldTokens = balanceOf(recipient);
-            require((heldTokens + amount) <= maxWallet, "You are buying more than what you can have in a single wallet.");
-        }
-    }
-
-    // Stuck Balances Functions
-    function rescueToken(address tokenAddress) external onlyOwner {
-        IERC20(tokenAddress).safeTransfer(msg.sender, IERC20(tokenAddress).balanceOf(address(this)));
-    }
-
-    function clearStuckBalance() external onlyOwner {
-        uint256 amountETH = address(this).balance;
-        payable(_msgSender()).sendValue(amountETH);
-    }
-    ///////////////////////////
-
-    function getCirculatingSupply() public view returns (uint256) {
-        return totalSupply() - balanceOf(DEAD) - balanceOf(ZERO);
-    }
-
-    function initializePair() external onlyOwner {
-        pair = IUniswapV2Factory(swapRouter.factory()).createPair(address(this), address(WFTM));
-    }
-
-    function setFeeReceivers(address _marketingWallet) external onlyOwner {
-        marketingWallet = payable(_marketingWallet);
-    }
-
-    function setMaxWallet(uint256 amount) external onlyOwner {
-        require(amount >= totalSupply() / 100);
-        maxWallet = amount;
-    }
-
-    function setIsFeeExempt(address holder, bool exempt) external onlyOwner {
-        isFeeExempt[holder] = exempt;
-    }
-
-}
- */
