@@ -73,7 +73,11 @@ contract Fr0xTest is Test {
     /*
 
 
-    function test_Check_LimtsAndFeeExemptions() public {
+    Check Swap trigger fees
+    Check limits are used if block timestamp < 48h after deploiement
+    Check if limits are not used if block timestamp > 48h after deploiement
+    Check fees are sent in FTM form to Marketing Wallet and Treasury
+    Check If transfer between two address dont trigger fees
 
     */
 }

@@ -67,8 +67,7 @@ contract Fr0x is ERC20, Ownable {
     uint256 public walletLimit;
     uint256 public feeSwapThreshold;
     bool public tradingEnabled;
-    bool public transferDelayEnabled = true;
-    bool public limitsEnabled = true;
+    uint256 public limitsTimestamp;
 
     uint256 public SELL_FEE = 500; // 5%
     uint256 public BUY_FEE = 500; // 5%
@@ -80,21 +79,10 @@ contract Fr0x is ERC20, Ownable {
     mapping(address => bool) public pools;
     mapping(address => bool) public exemptFromLimitsAndFee;
 
-    // EVENTS
-    event FeeExemption(address indexed account, bool isExempt);
-    event PoolUpdate(address indexed pair, bool indexed value);
-
     // ERRORS
-    error NotEnoughBalanceToOpenTrading();
-
     error CannotRemoveDefaultPair();
-    error MaximumFee();
-    error MinimumLimit();
-    error MinimumSwapThreshold();
-    error MaximumSwapThreshold();
     error TradingDisabled();
     error AlreadyInitialized();
-    error BlockTransferLimit();
     error TradeLimitExceeded();
     error WalletLimitExceeded();
 
@@ -103,6 +91,7 @@ contract Fr0x is ERC20, Ownable {
         tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 200); // 2%
         walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 200); // 2%
         feeSwapThreshold = _applyBasisPoints(TOTAL_SUPPLY, 5); // 0.05%
+        limitsTimestamp = block.timestamp + 2 days;
 
         TREASURY = _treasury;
         MARKETING_DEV = _marketingDev;
@@ -131,14 +120,6 @@ contract Fr0x is ERC20, Ownable {
 
     receive() external payable {}
 
-    function _applyBasisPoints(uint256 amount, uint256 basisPoints) internal pure returns (uint256) {
-        return (amount * basisPoints) / 10_000;
-    }
-
-    /*
-    // --------------
-    // TRANSFER
-
     function _transfer(address from, address to, uint256 amount) internal override {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
@@ -148,60 +129,50 @@ contract Fr0x is ERC20, Ownable {
             return;
         }
 
-        _handleLimits(from, to, amount);
+        if (block.timestamp < limitsTimestamp) _handleLimits(from, to, amount);
         uint256 finalAmount = _chargeFees(from, to, amount);
         _handleFeeSwap(from, to);
-
         super._transfer(from, to, finalAmount);
     }
 
-    // --------------
     // LIMITS
-
     function _handleLimits(address from, address to, uint256 amount) internal {
-        if (!limitsEnabled || _isSwapping || from == owner() || to == owner()) {
+        if (_isSwapping || from == owner() || to == owner()) {
             return;
         }
-
-        if (!tradingEnabled && !_exemptFromLimits[from] && !_exemptFromLimits[to]) {
+        if (!tradingEnabled && !exemptFromLimitsAndFee[from] && !exemptFromLimitsAndFee[to]) {
             revert TradingDisabled();
         }
-
         _applyLimits(from, to, amount);
     }
-
-    
 
     /// @dev Apply trade and balance limits
     function _applyLimits(address from, address to, uint256 amount) internal view {
         // buy
-        if (pools[from] && !_exemptFromLimits[to]) {
+        if (pools[from] && !exemptFromLimitsAndFee[to]) {
             if (amount > tradeLimit) revert TradeLimitExceeded();
             if (amount + balanceOf(to) > walletLimit) revert WalletLimitExceeded();
         }
         // sell
-        else if (pools[to] && !_exemptFromLimits[from]) {
+        else if (pools[to] && !exemptFromLimitsAndFee[from]) {
             if (amount > tradeLimit) revert TradeLimitExceeded();
         }
         // transfer
-        else if (!_exemptFromLimits[to]) {
+        else if (!exemptFromLimitsAndFee[to]) {
             if (amount + balanceOf(to) > walletLimit) revert WalletLimitExceeded();
         }
     }
 
-    // --------------
-    // FEES
-
     function _chargeFees(address from, address to, uint256 amount) internal returns (uint256) {
-        if (_isSwapping || _exemptFromFees[from] || _exemptFromFees[to]) {
+        if (_isSwapping || exemptFromLimitsAndFee[from] || exemptFromLimitsAndFee[to]) {
             return amount;
         }
 
         uint256 fees = 0;
-        if (pools[to] && sellFee > 0) {
-            fees = _applyBasisPoints(amount, sellFee);
-        } else if (pools[from] && buyFee > 0) {
-            fees = _applyBasisPoints(amount, buyFee);
+        if (pools[to] && SELL_FEE > 0) {
+            fees = _applyBasisPoints(amount, SELL_FEE);
+        } else if (pools[from] && BUY_FEE > 0) {
+            fees = _applyBasisPoints(amount, BUY_FEE);
         }
 
         if (fees > 0) {
@@ -216,7 +187,7 @@ contract Fr0x is ERC20, Ownable {
         bool canSwap = balanceOf(address(this)) >= feeSwapThreshold;
 
         // non-exempt sellers trigger fee swaps
-        if (canSwap && !_isSwapping && !pools[from] && pools[to] && !_exemptFromFees[from]) {
+        if (canSwap && !_isSwapping && !pools[from] && pools[to] && !exemptFromLimitsAndFee[from]) {
             _isSwapping = true;
             _swapAndDistributeFees();
             _isSwapping = false;
@@ -230,89 +201,36 @@ contract Fr0x is ERC20, Ownable {
             return;
         }
 
-        if (contractBalance > feeSwapThreshold * 20) {
-            contractBalance = feeSwapThreshold * 20;
-        }
-
         _swapTokensForEth(contractBalance);
 
-        (bool sent,) = _teamWallet.call{value: address(this).balance}("");
-        require(sent, "send failed");
+        uint256 feesForTreasury = _applyBasisPoints(address(this).balance, 7500); //75%
+        uint256 feesForMarketingDev = address(this).balance - feesForTreasury; //25%
+
+        (bool sentToTreasury,) = TREASURY.call{value: feesForTreasury}("");
+        require(sentToTreasury, "sent to treasury failed");
+        (bool sentToMarketingDev,) = MARKETING_DEV.call{value: feesForMarketingDev}("");
+        require(sentToMarketingDev, "sent to Marketing/dev failed");
     }
 
-    // --------------
-    // ADMIN
-
-    function removeLimits() external onlyOwner {
-        limitsEnabled = false;
+    function setMarketingWallet(address _newMarketingDev) external {
+        require(msg.sender == MARKETING_DEV, "Not authorized");
+        MARKETING_DEV = _newMarketingDev;
     }
 
-    function disableTransferDelay() external onlyOwner {
-        transferDelayEnabled = false;
+    function setTreasury(address _newTreasury) external {
+        require(msg.sender == TREASURY, "Not authorized");
+        TREASURY = _newTreasury;
     }
 
-    /// @notice Set swap size limit to `amount` tokens (in token units)
-    function setTradeLimit(uint256 amount) external onlyOwner {
-        // minimim 0.1% of supply
-        amount *= 1e18;
-        if (amount < _applyBasisPoints(TOTAL_SUPPLY, 10)) revert MinimumLimit();
-        tradeLimit = amount;
-    }
-
-    /// @notice Set wallet balance limit to `amount` tokens (in token units)
-    function setWalletLimit(uint256 amount) external onlyOwner {
-        // minimim 0.1% of supply
-        amount *= 1e18;
-        if (amount < _applyBasisPoints(TOTAL_SUPPLY, 10)) revert MinimumLimit();
-        walletLimit = amount;
-    }
-
-    function setExemptFromFees(address addr, bool exempt) external onlyOwner {
-        _exemptFromFees[addr] = exempt;
-        emit FeeExemption(addr, exempt);
-    }
-
-    function setExemptFromLimits(address addr, bool exempt) external onlyOwner {
-        _exemptFromLimits[addr] = exempt;
-    }
-
-    /// Set buy fee in basis points
-    function setBuyFee(uint256 fee) external onlyOwner {
-        if (fee > 500) revert MaximumFee(); // 5%
-        buyFee = fee;
-    }
-
-    /// Set sell fee in basis points
-    function setSellFee(uint256 fee) external onlyOwner {
-        if (fee > 500) revert MaximumFee(); // 5%
-        sellFee = fee;
-    }
-
-    function setPool(address pool, bool value) external onlyOwner {
+    function setPool(address pool, bool value) external {
+        require(msg.sender == TREASURY, "Not authorized");
         if (pool == uniswapV2Pair) revert CannotRemoveDefaultPair();
-        _setPool(pool, value);
-    }
-
-    function _setPool(address pool, bool value) private {
         pools[pool] = value;
-        emit PoolUpdate(pool, value);
     }
 
-    /// @notice Set fee swap threshold to `basisPoints` as a fraction of total supply
-    /// Set to 10000 to disable fee swaps
-    function setFeeSwapThreshold(uint256 basisPoints) external onlyOwner {
-        if (basisPoints < 1) revert MinimumSwapThreshold();
-        if (basisPoints > 10_000) revert MaximumSwapThreshold();
-        feeSwapThreshold = _applyBasisPoints(TOTAL_SUPPLY, basisPoints);
+    function _applyBasisPoints(uint256 amount, uint256 basisPoints) internal pure returns (uint256) {
+        return (amount * basisPoints) / 10_000;
     }
-
-    function setTeamWallet(address addr) external onlyOwner {
-        _teamWallet = payable(addr);
-    }
-
-    // --------------
-    // HELPERS
-
 
     function _swapTokensForEth(uint256 tokenAmount) private {
         // generate the uniswap pair path of token -> weth
@@ -331,5 +249,4 @@ contract Fr0x is ERC20, Ownable {
             block.timestamp
         );
     }
-    */
 }
