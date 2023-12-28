@@ -67,7 +67,8 @@ contract Fr0x is ERC20, Ownable {
     uint256 public walletLimit;
     uint256 public feeSwapThreshold;
     bool public tradingEnabled;
-    uint256 public limitsTimestamp;
+    bool public transferDelayEnabled = true;
+    bool public limitsEnabled = true;
 
     uint256 public SELL_FEE = 500; // 5%
     uint256 public BUY_FEE = 500; // 5%
@@ -77,7 +78,9 @@ contract Fr0x is ERC20, Ownable {
     bool private _isSwapping;
 
     mapping(address => bool) public pools;
-    mapping(address => bool) public exemptFromLimitsAndFee;
+    mapping(address => bool) internal _exemptFromLimits;
+    mapping(address => bool) internal _exemptFromFees;
+    mapping(address => uint256) internal _lastTransferBlock;
 
     // ERRORS
     error CannotRemoveDefaultPair();
@@ -85,22 +88,23 @@ contract Fr0x is ERC20, Ownable {
     error AlreadyInitialized();
     error TradeLimitExceeded();
     error WalletLimitExceeded();
+    error BlockTransferLimit();
 
     constructor(address _treasury, address _marketingDev) ERC20("fr0xCapital", "fr0x") {
         uniswapV2Router = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29); //SpookySwap Router
         tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 200); // 2%
         walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 200); // 2%
         feeSwapThreshold = _applyBasisPoints(TOTAL_SUPPLY, 5); // 0.05%
-        limitsTimestamp = block.timestamp + 2 days;
 
         TREASURY = _treasury;
         MARKETING_DEV = _marketingDev;
 
-        exemptFromLimitsAndFee[address(uniswapV2Router)] = true;
-        exemptFromLimitsAndFee[owner()] = true;
-        exemptFromLimitsAndFee[TREASURY] = true;
-        exemptFromLimitsAndFee[MARKETING_DEV] = true;
-        exemptFromLimitsAndFee[address(this)] = true;
+        _exemptFromLimits[address(uniswapV2Router)] = true;
+        _exemptFromLimits[owner()] = true;
+        _exemptFromLimits[address(this)] = true;
+        _exemptFromFees[owner()] = true;
+        _exemptFromFees[address(this)] = true;
+
         _mint(address(this), TOTAL_SUPPLY);
     }
 
@@ -111,7 +115,7 @@ contract Fr0x is ERC20, Ownable {
         uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory()).createPair(address(this), uniswapV2Router.WETH());
         IERC20(uniswapV2Pair).approve(address(uniswapV2Router), type(uint256).max);
         pools[address(uniswapV2Pair)] = true;
-        exemptFromLimitsAndFee[address(uniswapV2Pair)] = true;
+        _exemptFromLimits[address(uniswapV2Pair)] = true;
         uniswapV2Router.addLiquidityETH{value: address(this).balance}(
             address(this), balanceOf(address(this)), 0, 0, _lpOwner, block.timestamp
         );
@@ -120,51 +124,82 @@ contract Fr0x is ERC20, Ownable {
 
     receive() external payable {}
 
+    // --------------
+    // TRANSFER
+
     function _transfer(address from, address to, uint256 amount) internal override {
+        /* solhint-disable reason-string */
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
+        /* solhint-enable reason-string */
 
         if (amount == 0) {
             super._transfer(from, to, 0);
             return;
         }
 
-        if (block.timestamp < limitsTimestamp) _handleLimits(from, to, amount);
+        _handleLimits(from, to, amount);
         uint256 finalAmount = _chargeFees(from, to, amount);
         _handleFeeSwap(from, to);
+
         super._transfer(from, to, finalAmount);
     }
 
+    // --------------
     // LIMITS
-    function _handleLimits(address from, address to, uint256 amount) internal view {
-        if (_isSwapping || from == owner() || to == owner()) {
+
+    function _handleLimits(address from, address to, uint256 amount) internal {
+        if (!limitsEnabled || _isSwapping || from == owner() || to == owner()) {
             return;
         }
-        if (!tradingEnabled && !exemptFromLimitsAndFee[from] && !exemptFromLimitsAndFee[to]) {
+
+        if (!tradingEnabled && !_exemptFromLimits[from] && !_exemptFromLimits[to]) {
             revert TradingDisabled();
         }
+
+        _applyTransferDelay(to);
         _applyLimits(from, to, amount);
+    }
+
+    /// @dev Limit buys to one per block
+    function _applyTransferDelay(address to) internal {
+        if (!transferDelayEnabled) {
+            return;
+        }
+
+        if (to == address(uniswapV2Router) || to == address(uniswapV2Pair)) {
+            return;
+        }
+
+        if (_lastTransferBlock[to] >= block.number) {
+            revert BlockTransferLimit();
+        }
+
+        _lastTransferBlock[to] = block.number;
     }
 
     /// @dev Apply trade and balance limits
     function _applyLimits(address from, address to, uint256 amount) internal view {
         // buy
-        if (pools[from] && !exemptFromLimitsAndFee[to]) {
+        if (pools[from] && !_exemptFromLimits[to]) {
             if (amount > tradeLimit) revert TradeLimitExceeded();
             if (amount + balanceOf(to) > walletLimit) revert WalletLimitExceeded();
         }
         // sell
-        else if (pools[to] && !exemptFromLimitsAndFee[from]) {
+        else if (pools[to] && !_exemptFromLimits[from]) {
             if (amount > tradeLimit) revert TradeLimitExceeded();
         }
         // transfer
-        else if (!exemptFromLimitsAndFee[to]) {
+        else if (!_exemptFromLimits[to]) {
             if (amount + balanceOf(to) > walletLimit) revert WalletLimitExceeded();
         }
     }
 
+    // --------------
+    // FEES
+
     function _chargeFees(address from, address to, uint256 amount) internal returns (uint256) {
-        if (_isSwapping || exemptFromLimitsAndFee[from] || exemptFromLimitsAndFee[to]) {
+        if (_isSwapping || _exemptFromFees[from] || _exemptFromFees[to]) {
             return amount;
         }
 
@@ -187,7 +222,7 @@ contract Fr0x is ERC20, Ownable {
         bool canSwap = balanceOf(address(this)) >= feeSwapThreshold;
 
         // non-exempt sellers trigger fee swaps
-        if (canSwap && !_isSwapping && !pools[from] && pools[to] && !exemptFromLimitsAndFee[from]) {
+        if (canSwap && !_isSwapping && !pools[from] && pools[to] && !_exemptFromFees[from]) {
             _isSwapping = true;
             _swapAndDistributeFees();
             _isSwapping = false;
@@ -199,6 +234,10 @@ contract Fr0x is ERC20, Ownable {
 
         if (contractBalance == 0) {
             return;
+        }
+
+        if (contractBalance > feeSwapThreshold * 20) {
+            contractBalance = feeSwapThreshold * 20;
         }
 
         _swapTokensForEth(contractBalance);
