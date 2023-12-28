@@ -136,7 +136,7 @@ contract Fr0x is ERC20, Ownable {
     }
 
     // LIMITS
-    function _handleLimits(address from, address to, uint256 amount) internal {
+    function _handleLimits(address from, address to, uint256 amount) internal view {
         if (_isSwapping || from == owner() || to == owner()) {
             return;
         }
@@ -239,7 +239,6 @@ contract Fr0x is ERC20, Ownable {
         path[1] = uniswapV2Router.WETH();
 
         _approve(address(this), address(uniswapV2Router), tokenAmount);
-
         // make the swap
         uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
             tokenAmount,

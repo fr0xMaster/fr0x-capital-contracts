@@ -5,8 +5,17 @@
 
 pragma solidity 0.8.20;
 
+import {IUniswapV2Pair} from "@uniswap-core/contracts/interfaces/IUniswapV2Pair.sol";
+import {IUniswapV2Router02} from "@uniswap-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import "forge-std/Test.sol";
 import "../src/Fr0x.sol";
+
+interface IWFTM is IERC20 {
+    function deposit() external payable;
+    function withdraw(uint256) external;
+}
 
 contract Fr0xTest is Test {
     uint256 public fantomFork;
@@ -20,8 +29,11 @@ contract Fr0xTest is Test {
     address public bob = makeAddr("bob");
     address public alice = makeAddr("alice");
     uint256 public TODAY = 1703462400;
+    address public wftmToken = 0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83;
+    IWFTM public immutable WFTM = IWFTM(wftmToken);
 
     //FLOW
+    //0 - Create wallet for devmarketing and treasruy on ledger
     //1 - Add 1010 FTM to deployer address
     //2 - Deploy Contract with deployer
     //3 - Trigger openTrading Function avec msg.value de 1000FTM et address de la ledger en param
@@ -34,12 +46,22 @@ contract Fr0xTest is Test {
         fantomFork = vm.createFork(FANTOM_RPC_URL);
         vm.selectFork(fantomFork);
         vm.warp(TODAY);
+        vm.deal(deployer, 1_000 ether);
+        vm.deal(alice, 10_010 ether);
+        vm.deal(bob, 10_010 ether);
+
+        vm.startPrank(alice);
+        WFTM.deposit{value: 10_000 ether}();
+        vm.stopPrank();
+        vm.startPrank(bob);
+        WFTM.deposit{value: 10_000 ether}();
+        vm.stopPrank();
         vm.startPrank(deployer);
         fr0x = new Fr0x(TREASURY, MARKETING_DEV);
+    }
 
-        vm.deal(alice, 10_000 ether);
-        vm.deal(deployer, 1_000 ether);
-        vm.deal(bob, 10_000 ether);
+    function swapFTMForTokens(uint256 _fr0xAmount, address _to) public payable {
+        // generate the uniswap pair path of token -> weth
     }
 
     function test_Check_SupplyIsOwnedByContract() public {
@@ -67,13 +89,44 @@ contract Fr0xTest is Test {
         fr0x.openTrading{value: 1000 ether}(myLedger);
         assertEq(fr0x.tradingEnabled(), true);
         assertGe(IERC20(fr0x.uniswapV2Pair()).totalSupply(), IERC20(fr0x.uniswapV2Pair()).balanceOf(myLedger));
-        emit log_named_uint("lp balance of my Ledger", IERC20(fr0x.uniswapV2Pair()).balanceOf(myLedger));
+    }
+
+    function test_Check_SwapTriggerFees() public {
+        fr0x.openTrading{value: 1000 ether}(myLedger);
+        vm.stopPrank();
+        vm.startPrank(alice);
+        assertEq(WFTM.balanceOf(alice), 10_000 ether);
+        uint256 fr0xBalanceOfAliceBefore = fr0x.balanceOf(alice);
+        assertEq(fr0xBalanceOfAliceBefore, 0);
+        emit log_named_uint("fr0xBalance before", fr0xBalanceOfAliceBefore);
+
+        address[] memory path = new address[](2);
+        path[0] = wftmToken;
+        path[1] = address(fr0x);
+        // make the swap
+        IUniswapV2Router02(fr0x.uniswapV2Router()).swapExactETHForTokens{value: 1 ether}(
+            1 ether, path, alice, block.timestamp
+        );
+
+        uint256 fr0xBalanceOfAliceAfter = fr0x.balanceOf(alice);
+        emit log_named_uint("fr0xBalance receive for 1 FTM", fr0xBalanceOfAliceAfter);
+        assertGt(fr0xBalanceOfAliceAfter, fr0xBalanceOfAliceBefore);
+        //swapFTMForTokens{value: 1 ether}(1 ether, alice);
+
+        /*
+        
+
+        
+
+        
+         */
     }
 
     /*
 
 
     Check Swap trigger fees
+
     Check limits are used if block timestamp < 48h after deploiement
     Check if limits are not used if block timestamp > 48h after deploiement
     Check fees are sent in FTM form to Marketing Wallet and Treasury
