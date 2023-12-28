@@ -12,11 +12,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/Test.sol";
 import "../src/Fr0x.sol";
 
-interface IWFTM is IERC20 {
-    function deposit() external payable;
-    function withdraw(uint256) external;
-}
-
 contract Fr0xTest is Test {
     uint256 public fantomFork;
     Fr0x public fr0x;
@@ -28,16 +23,17 @@ contract Fr0xTest is Test {
     address public myLedger = makeAddr("myLedger");
     address public bob = makeAddr("bob");
     address public alice = makeAddr("alice");
+    address public wojak = makeAddr("wojak");
+
     uint256 public TODAY = 1703462400;
     address public wftmToken = 0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83;
-    IWFTM public immutable WFTM = IWFTM(wftmToken);
 
     //FLOW
     //0 - Create wallet for devmarketing and treasruy on ledger
-    //1 - Add 1010 FTM to deployer address
-    //2 - Deploy Contract with deployer
+    //1 - Add 1010 FTM to deployer address sur metamask
+    //2 - Deploy Contract with deployer et en parametre
     //3 - Trigger openTrading Function avec msg.value de 1000FTM et address de la ledger en param
-    //3-5 - Achete avec slippage de 10% 2% du supply avec le wallet a stella et avec ma ledger
+    //3-5 - Achete max 2.5% du supply avec le wallet a stella et avec ma ledger
     //5 - Lock LP token avec la Ledger pendant 1 an sur Team.finance
     //6 - Renouce Ownership avec Deployer
 
@@ -49,20 +45,12 @@ contract Fr0xTest is Test {
         vm.deal(deployer, 1_000 ether);
         vm.deal(alice, 20_000 ether);
         vm.deal(bob, 20_000 ether);
+        vm.deal(wojak, 20_000 ether);
 
-        vm.startPrank(alice);
-        WFTM.deposit{value: 10_000 ether}();
-        vm.stopPrank();
-        vm.startPrank(bob);
-        WFTM.deposit{value: 10_000 ether}();
-        vm.stopPrank();
         vm.startPrank(deployer);
         fr0x = new Fr0x(TREASURY, MARKETING_DEV);
     }
 
-    /*
-
-    
     function test_Check_SupplyIsOwnedByContract() public {
         uint256 supply = fr0x.totalSupply();
         assertEq(supply, fr0x.TOTAL_SUPPLY());
@@ -74,9 +62,9 @@ contract Fr0xTest is Test {
     }
 
     function test_Check_LimtsAndThreeSold() public {
-        assertEq(fr0x.tradeLimit(), (fr0x.totalSupply() * 2) / 100); // 2%
-        assertEq(fr0x.walletLimit(), (fr0x.totalSupply() * 2) / 100); // 2%
-        assertEq(fr0x.feeSwapThreshold(), (fr0x.totalSupply() * 5) / 10000); // 2%
+        assertEq(fr0x.tradeLimit(), (fr0x.totalSupply() * 25) / 1000); // 2.5%
+        assertEq(fr0x.walletLimit(), (fr0x.totalSupply() * 25) / 1000); // 2.5%
+        assertEq(fr0x.feeSwapThreshold(), (fr0x.totalSupply() * 5) / 10000); // 0.05%
     }
 
     function test_revert_OpenTradingButLessThan1000FTMOnContract() public {
@@ -89,16 +77,15 @@ contract Fr0xTest is Test {
         assertEq(fr0x.tradingEnabled(), true);
         assertGe(IERC20(fr0x.uniswapV2Pair()).totalSupply(), IERC20(fr0x.uniswapV2Pair()).balanceOf(myLedger));
     }
-    */
+
     function test_Check_SwapTriggerFees() public {
         fr0x.openTrading{value: 1000 ether}(myLedger);
         vm.stopPrank();
         vm.startPrank(alice);
-        assertEq(WFTM.balanceOf(alice), 10_000 ether);
-        uint256 fr0xBalanceOfAliceBefore = fr0x.balanceOf(alice);
-        assertEq(fr0xBalanceOfAliceBefore, 0);
-        emit log_named_uint("fr0x contract balance before", fr0x.balanceOf(address(fr0x)));
-        emit log_named_uint("fr0xBalance before", fr0xBalanceOfAliceBefore);
+        uint256 aliceBalanceBefore = fr0x.balanceOf(alice);
+        uint256 contractBalanceBefore = fr0x.balanceOf(address(fr0x));
+        assertEq(aliceBalanceBefore, 0);
+        assertEq(contractBalanceBefore, 0);
 
         address[] memory path = new address[](2);
         path[0] = wftmToken;
@@ -107,50 +94,168 @@ contract Fr0xTest is Test {
         IUniswapV2Router02(fr0x.uniswapV2Router()).swapExactETHForTokensSupportingFeeOnTransferTokens{value: 20 ether}(
             20 ether, path, alice, block.timestamp
         );
-        uint256 fr0xBalanceOfAliceAfter = fr0x.balanceOf(alice);
-        emit log_named_uint("fr0xBalance receive for 50 FTM", fr0xBalanceOfAliceAfter);
-        emit log_named_uint("fr0x contract balance after", fr0x.balanceOf(address(fr0x)));
-
-        assertGt(fr0xBalanceOfAliceAfter, fr0xBalanceOfAliceBefore);
-
-        /*
-        // SWAP BACK
-
-        address[] memory pathSwapback = new address[](2);
-        pathSwapback[0] = address(fr0x);
-        pathSwapback[1] = wftmToken;
-
-        fr0x.approve(address(fr0x.uniswapV2Router()), fr0xBalanceOfAliceAfter);
-        // make the swap
-        IUniswapV2Router02(fr0x.uniswapV2Router()).swapExactTokensForETHSupportingFeeOnTransferTokens(
-            fr0xBalanceOfAliceAfter,
-            0, // accept any amount of ETH
-            pathSwapback,
-            address(this),
-            block.timestamp
-        );
-
-        uint256 fr0xBalanceOfAliceAfterSwapBack = fr0x.balanceOf(alice);
-        emit log_named_uint("fr0xBalanceOfAliceAfterSwapBack", fr0xBalanceOfAliceAfterSwapBack);
-
-
-        
-
-        
-
-        
-         */
+        uint256 aliceBalanceAfter = fr0x.balanceOf(alice);
+        uint256 contractBalanceAfter = fr0x.balanceOf(address(fr0x));
+        assertGt(aliceBalanceAfter, aliceBalanceBefore);
+        assertGt(contractBalanceAfter, contractBalanceBefore);
     }
 
-    /*
+    function test_Check_SwapBackAlsoTriggerFees() public {
+        fr0x.openTrading{value: 1000 ether}(myLedger);
+        vm.stopPrank();
+        vm.startPrank(alice);
+        // make the swap
+        address[] memory path = new address[](2);
+        path[0] = wftmToken;
+        path[1] = address(fr0x);
+        IUniswapV2Router02(fr0x.uniswapV2Router()).swapExactETHForTokensSupportingFeeOnTransferTokens{value: 2 ether}(
+            2 ether, path, alice, block.timestamp
+        );
+        uint256 aliceBalanceAfterFirstSwap = fr0x.balanceOf(alice);
+        uint256 contractBalanceAfterFirstSwap = fr0x.balanceOf(address(fr0x));
+        address[] memory pathBack = new address[](2);
+        pathBack[0] = address(fr0x);
+        pathBack[1] = wftmToken;
+        fr0x.approve(address(fr0x.uniswapV2Router()), aliceBalanceAfterFirstSwap);
+        // make the swap
+        IUniswapV2Router02(fr0x.uniswapV2Router()).swapExactTokensForETHSupportingFeeOnTransferTokens(
+            aliceBalanceAfterFirstSwap,
+            0, // accept any amount of ETH
+            pathBack,
+            alice,
+            block.timestamp
+        );
+        uint256 aliceBalanceAfterSwapBack = fr0x.balanceOf(alice);
+        uint256 contractBalanceAfterSwapBack = fr0x.balanceOf(address(fr0x));
+        assertEq(aliceBalanceAfterSwapBack, 0);
+        assertGt(contractBalanceAfterSwapBack, contractBalanceAfterFirstSwap);
+    }
 
+    function test_Check_NoLimitsAfter48Hours() public {
+        fr0x.openTrading{value: 1000 ether}(myLedger);
+        vm.warp(TODAY + 2 days + 1);
+        vm.stopPrank();
+        vm.startPrank(alice);
+        address[] memory path = new address[](2);
+        path[0] = wftmToken;
+        path[1] = address(fr0x);
+        IUniswapV2Router02(fr0x.uniswapV2Router()).swapExactETHForTokensSupportingFeeOnTransferTokens{value: 2000 ether}(
+            200 ether, path, alice, block.timestamp
+        );
+        assertGt(fr0x.balanceOf(alice), fr0x.walletLimit());
+    }
 
-    Check Swap trigger fees
+    function test_Check_TransferBetweenTwoWalletsDontTriggerFees() public {
+        fr0x.openTrading{value: 1000 ether}(myLedger);
+        vm.stopPrank();
+        vm.startPrank(alice);
+        uint256 aliceBalanceBefore = fr0x.balanceOf(alice);
+        assertEq(aliceBalanceBefore, 0);
+        address[] memory path = new address[](2);
+        path[0] = wftmToken;
+        path[1] = address(fr0x);
+        // make the swap
+        IUniswapV2Router02(fr0x.uniswapV2Router()).swapExactETHForTokensSupportingFeeOnTransferTokens{value: 25 ether}(
+            25 ether, path, alice, block.timestamp
+        );
+        uint256 aliceBalanceAfter = fr0x.balanceOf(alice);
+        uint256 bobBalanceBeforeTransfer = fr0x.balanceOf(bob);
+        assertGt(aliceBalanceAfter, aliceBalanceBefore);
+        assertEq(bobBalanceBeforeTransfer, 0);
 
-    Check limits are used if block timestamp < 48h after deploiement
-    Check if limits are not used if block timestamp > 48h after deploiement
-    Check fees are sent in FTM form to Marketing Wallet and Treasury
-    Check If transfer between two address dont trigger fees
+        fr0x.transfer(bob, aliceBalanceAfter);
+        uint256 bobBalanceAfterTransfer = fr0x.balanceOf(bob);
+        uint256 aliceBalanceAfterTransfer = fr0x.balanceOf(alice);
+        assertEq(aliceBalanceAfterTransfer, 0);
+        assertEq(aliceBalanceAfter, bobBalanceAfterTransfer);
+    }
 
-    */
+    function test_Check_SwapThreesoldTriggerSentToTreasuryAndMarketingDevWallet() public {
+        fr0x.openTrading{value: 1000 ether}(myLedger);
+        vm.stopPrank();
+        vm.startPrank(alice);
+        uint256 aliceBalanceBeforeFirstSwap = fr0x.balanceOf(alice);
+        uint256 contractBalanceBeforeFirstSwap = fr0x.balanceOf(address(fr0x));
+        uint256 treasuryBalanceBeforeFirstSwap = fr0x.balanceOf(TREASURY);
+        uint256 marketingDevBalanceBeforeFirstSwap = fr0x.balanceOf(MARKETING_DEV);
+
+        assertEq(aliceBalanceBeforeFirstSwap, 0);
+        assertEq(contractBalanceBeforeFirstSwap, 0);
+        assertEq(treasuryBalanceBeforeFirstSwap, 0);
+        assertEq(marketingDevBalanceBeforeFirstSwap, 0);
+
+        address[] memory path = new address[](2);
+        path[0] = wftmToken;
+        path[1] = address(fr0x);
+        IUniswapV2Router02(fr0x.uniswapV2Router()).swapExactETHForTokensSupportingFeeOnTransferTokens{value: 25 ether}(
+            25 ether, path, alice, block.timestamp
+        );
+
+        uint256 aliceBalanceAfterFirstSwap = fr0x.balanceOf(alice);
+        uint256 contractBalanceAfterFirstSwap = fr0x.balanceOf(address(fr0x));
+        uint256 treasuryBalanceAfterFirstSwap = fr0x.balanceOf(TREASURY);
+        uint256 marketingDevBalanceAfterFirstSwap = fr0x.balanceOf(MARKETING_DEV);
+
+        assertGt(aliceBalanceAfterFirstSwap, aliceBalanceBeforeFirstSwap);
+        assertGt(contractBalanceAfterFirstSwap, contractBalanceBeforeFirstSwap);
+        assertEq(treasuryBalanceAfterFirstSwap, 0);
+        assertEq(marketingDevBalanceAfterFirstSwap, 0);
+
+        vm.stopPrank();
+        vm.startPrank(bob);
+        uint256 bobBalanceBeforeSecondSwap = fr0x.balanceOf(bob);
+        address[] memory pathSecondSwap = new address[](2);
+        pathSecondSwap[0] = wftmToken;
+        pathSecondSwap[1] = address(fr0x);
+        IUniswapV2Router02(fr0x.uniswapV2Router()).swapExactETHForTokensSupportingFeeOnTransferTokens{value: 25 ether}(
+            25 ether, path, bob, block.timestamp
+        );
+
+        uint256 bobBalanceAfterSecondSwap = fr0x.balanceOf(bob);
+        uint256 contractBalanceAfterSecondSwap = fr0x.balanceOf(address(fr0x));
+        assertGt(bobBalanceAfterSecondSwap, bobBalanceBeforeSecondSwap);
+        assertGt(contractBalanceAfterSecondSwap, contractBalanceAfterFirstSwap);
+        assertLt(bobBalanceAfterSecondSwap, aliceBalanceAfterFirstSwap);
+
+        vm.stopPrank();
+        vm.startPrank(wojak);
+        uint256 wojakBalanceBeforeThirdSwap = fr0x.balanceOf(wojak);
+
+        address[] memory pathThirdSwap = new address[](2);
+        pathThirdSwap[0] = wftmToken;
+        pathThirdSwap[1] = address(fr0x);
+        // make the swap
+        IUniswapV2Router02(fr0x.uniswapV2Router()).swapExactETHForTokensSupportingFeeOnTransferTokens{value: 25 ether}(
+            25 ether, path, wojak, block.timestamp
+        );
+
+        uint256 wojakBalanceAfterThirdSwap = fr0x.balanceOf(wojak);
+        uint256 contractBalanceAfterThirdSwap = fr0x.balanceOf(address(fr0x));
+        assertGt(wojakBalanceAfterThirdSwap, wojakBalanceBeforeThirdSwap);
+        assertGt(contractBalanceAfterThirdSwap, contractBalanceAfterSecondSwap);
+
+        vm.stopPrank();
+        vm.startPrank(alice);
+
+        address[] memory pathBack = new address[](2);
+        pathBack[0] = address(fr0x);
+        pathBack[1] = wftmToken;
+        fr0x.approve(address(fr0x.uniswapV2Router()), aliceBalanceAfterFirstSwap);
+        // make the swap
+        IUniswapV2Router02(fr0x.uniswapV2Router()).swapExactTokensForETHSupportingFeeOnTransferTokens(
+            aliceBalanceAfterFirstSwap,
+            0, // accept any amount of ETH
+            pathBack,
+            alice,
+            block.timestamp
+        );
+        uint256 aliceBalanceAfterFourthSwap = fr0x.balanceOf(alice);
+        assertEq(aliceBalanceAfterFourthSwap, 0);
+        uint256 contractBalanceAfterFourthSwap = fr0x.balanceOf(address(fr0x));
+        assertEq(contractBalanceAfterFourthSwap, 0);
+
+        assertGt(MARKETING_DEV.balance, 0);
+        assertGt(TREASURY.balance, 0);
+        assertGt(TREASURY.balance, MARKETING_DEV.balance);
+    }
 }

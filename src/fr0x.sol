@@ -67,7 +67,7 @@ contract Fr0x is ERC20, Ownable {
     uint256 public walletLimit;
     uint256 public feeSwapThreshold;
     bool public tradingEnabled;
-    bool public limitsEnabled = true;
+    uint256 public limitsBefore;
 
     uint256 public SELL_FEE = 500; // 5%
     uint256 public BUY_FEE = 500; // 5%
@@ -79,9 +79,7 @@ contract Fr0x is ERC20, Ownable {
     mapping(address => bool) public pools;
     mapping(address => bool) internal _exemptFromLimits;
     mapping(address => bool) internal _exemptFromFees;
-    mapping(address => uint256) internal _lastTransferBlock;
 
-    // ERRORS
     error CannotRemoveDefaultPair();
     error TradingDisabled();
     error AlreadyInitialized();
@@ -90,9 +88,11 @@ contract Fr0x is ERC20, Ownable {
 
     constructor(address _treasury, address _marketingDev) ERC20("fr0xCapital", "fr0x") {
         uniswapV2Router = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29); //SpookySwap Router
-        tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 200); // 2%
-        walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 200); // 2%
+        tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 250); // 2.5%
+        walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 250); // 2.5%
         feeSwapThreshold = _applyBasisPoints(TOTAL_SUPPLY, 5); // 0.05%
+
+        limitsBefore = block.timestamp + 6 hours;
 
         TREASURY = _treasury;
         MARKETING_DEV = _marketingDev;
@@ -122,32 +122,24 @@ contract Fr0x is ERC20, Ownable {
 
     receive() external payable {}
 
-    // --------------
-    // TRANSFER
-
     function _transfer(address from, address to, uint256 amount) internal override {
-        /* solhint-disable reason-string */
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
-        /* solhint-enable reason-string */
 
         if (amount == 0) {
             super._transfer(from, to, 0);
             return;
         }
 
-        _handleLimits(from, to, amount);
+        if (block.timestamp < limitsBefore) _handleLimits(from, to, amount);
         uint256 finalAmount = _chargeFees(from, to, amount);
         _handleFeeSwap(from, to);
 
         super._transfer(from, to, finalAmount);
     }
 
-    // --------------
-    // LIMITS
-
     function _handleLimits(address from, address to, uint256 amount) internal view {
-        if (!limitsEnabled || _isSwapping || from == owner() || to == owner()) {
+        if (_isSwapping || from == owner() || to == owner()) {
             return;
         }
 
@@ -158,7 +150,6 @@ contract Fr0x is ERC20, Ownable {
         _applyLimits(from, to, amount);
     }
 
-    /// @dev Apply trade and balance limits
     function _applyLimits(address from, address to, uint256 amount) internal view {
         // buy
         if (pools[from] && !_exemptFromLimits[to]) {
@@ -174,9 +165,6 @@ contract Fr0x is ERC20, Ownable {
             if (amount + balanceOf(to) > walletLimit) revert WalletLimitExceeded();
         }
     }
-
-    // --------------
-    // FEES
 
     function _chargeFees(address from, address to, uint256 amount) internal returns (uint256) {
         if (_isSwapping || _exemptFromFees[from] || _exemptFromFees[to]) {
@@ -197,7 +185,6 @@ contract Fr0x is ERC20, Ownable {
         return amount - fees;
     }
 
-    /// @dev swaps and distributes accumulated fees
     function _handleFeeSwap(address from, address to) internal {
         bool canSwap = balanceOf(address(this)) >= feeSwapThreshold;
 
@@ -224,7 +211,6 @@ contract Fr0x is ERC20, Ownable {
 
         uint256 feesForTreasury = _applyBasisPoints(address(this).balance, 7500); //75%
         uint256 feesForMarketingDev = address(this).balance - feesForTreasury; //25%
-
         (bool sentToTreasury,) = TREASURY.call{value: feesForTreasury}("");
         require(sentToTreasury, "sent to treasury failed");
         (bool sentToMarketingDev,) = MARKETING_DEV.call{value: feesForMarketingDev}("");
@@ -252,13 +238,11 @@ contract Fr0x is ERC20, Ownable {
     }
 
     function _swapTokensForEth(uint256 tokenAmount) private {
-        // generate the uniswap pair path of token -> weth
         address[] memory path = new address[](2);
         path[0] = address(this);
         path[1] = uniswapV2Router.WETH();
 
         _approve(address(this), address(uniswapV2Router), tokenAmount);
-        // make the swap
         uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
             tokenAmount,
             0, // accept any amount of ETH
