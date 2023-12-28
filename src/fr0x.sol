@@ -88,11 +88,11 @@ contract Fr0x is ERC20, Ownable {
 
     constructor(address _treasury, address _marketingDev) ERC20("fr0xCapital", "fr0x") {
         uniswapV2Router = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29); //SpookySwap Router
-        tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 250); // 2.5%
-        walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 250); // 2.5%
+        tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 100); // 2.5%
+        walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 100); // 2.5%
         feeSwapThreshold = _applyBasisPoints(TOTAL_SUPPLY, 5); // 0.05%
 
-        limitsBefore = block.timestamp + 6 hours;
+        limitsBefore = block.timestamp + 4 hours;
 
         TREASURY = _treasury;
         MARKETING_DEV = _marketingDev;
@@ -108,7 +108,7 @@ contract Fr0x is ERC20, Ownable {
 
     function openTrading(address _lpOwner) external payable onlyOwner {
         if (tradingEnabled) revert AlreadyInitialized();
-        require(msg.value == 1000 ether, "Need 1000 FTM to Open Trading");
+        require(msg.value == 2000 ether, "Need 2000 FTM to Open Trading");
         _approve(address(this), address(uniswapV2Router), TOTAL_SUPPLY);
         uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory()).createPair(address(this), uniswapV2Router.WETH());
         IERC20(uniswapV2Pair).approve(address(uniswapV2Router), type(uint256).max);
