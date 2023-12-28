@@ -67,7 +67,6 @@ contract Fr0x is ERC20, Ownable {
     uint256 public walletLimit;
     uint256 public feeSwapThreshold;
     bool public tradingEnabled;
-    bool public transferDelayEnabled = true;
     bool public limitsEnabled = true;
 
     uint256 public SELL_FEE = 500; // 5%
@@ -88,7 +87,6 @@ contract Fr0x is ERC20, Ownable {
     error AlreadyInitialized();
     error TradeLimitExceeded();
     error WalletLimitExceeded();
-    error BlockTransferLimit();
 
     constructor(address _treasury, address _marketingDev) ERC20("fr0xCapital", "fr0x") {
         uniswapV2Router = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29); //SpookySwap Router
@@ -148,7 +146,7 @@ contract Fr0x is ERC20, Ownable {
     // --------------
     // LIMITS
 
-    function _handleLimits(address from, address to, uint256 amount) internal {
+    function _handleLimits(address from, address to, uint256 amount) internal view {
         if (!limitsEnabled || _isSwapping || from == owner() || to == owner()) {
             return;
         }
@@ -157,25 +155,7 @@ contract Fr0x is ERC20, Ownable {
             revert TradingDisabled();
         }
 
-        _applyTransferDelay(to);
         _applyLimits(from, to, amount);
-    }
-
-    /// @dev Limit buys to one per block
-    function _applyTransferDelay(address to) internal {
-        if (!transferDelayEnabled) {
-            return;
-        }
-
-        if (to == address(uniswapV2Router) || to == address(uniswapV2Pair)) {
-            return;
-        }
-
-        if (_lastTransferBlock[to] >= block.number) {
-            revert BlockTransferLimit();
-        }
-
-        _lastTransferBlock[to] = block.number;
     }
 
     /// @dev Apply trade and balance limits
