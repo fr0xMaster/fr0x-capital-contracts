@@ -2,7 +2,7 @@
 /* solhint-disable var-name-mixedcase */
 /* solhint-disable func-name-mixedcase */
 /* solhint-disable  private-vars-leading-underscore */
-pragma solidity ^0.8.20;
+pragma solidity 0.8.19;
 
 /**
  * fr0x Capital ($fr0x)
@@ -88,8 +88,8 @@ contract Fr0x is ERC20, Ownable {
 
     constructor(address _treasury, address _marketingDev) ERC20("fr0xCapital", "fr0x") {
         uniswapV2Router = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29); //SpookySwap Router
-        tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 100); // 2.5%
-        walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 100); // 2.5%
+        tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 100); // 1%
+        walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 100); // 1%
         feeSwapThreshold = _applyBasisPoints(TOTAL_SUPPLY, 5); // 0.05%
 
         limitsBefore = block.timestamp + 4 hours;
@@ -106,9 +106,9 @@ contract Fr0x is ERC20, Ownable {
         _mint(address(this), TOTAL_SUPPLY);
     }
 
-    function openTrading(address _lpOwner) external payable onlyOwner {
+    function openTrading(address _lpOwner) external onlyOwner {
         if (tradingEnabled) revert AlreadyInitialized();
-        require(msg.value == 2000 ether, "Need 2000 FTM to Open Trading");
+        require(address(this).balance >= 2000 ether, "Need 2000 FTM to Open Trading");
         _approve(address(this), address(uniswapV2Router), TOTAL_SUPPLY);
         uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory()).createPair(address(this), uniswapV2Router.WETH());
         IERC20(uniswapV2Pair).approve(address(uniswapV2Router), type(uint256).max);
@@ -119,6 +119,24 @@ contract Fr0x is ERC20, Ownable {
         );
         tradingEnabled = true;
     }
+
+    /*
+    function openTrading() external onlyOwner {
+        if (tradingEnabled) revert AlreadyInitialized();
+        _approve(address(this), address(uniswapV2Router), TOTAL_SUPPLY);
+        uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory()).createPair(address(this), uniswapV2Router.WETH());
+        IERC20(uniswapV2Pair).approve(address(uniswapV2Router), type(uint256).max);
+
+        pools[address(uniswapV2Pair)] = true;
+        _exemptFromLimits[address(uniswapV2Pair)] = true;
+
+        uniswapV2Router.addLiquidityETH{value: address(this).balance}(
+            address(this), balanceOf(address(this)), 0, 0, owner(), block.timestamp
+        );
+
+        tradingEnabled = true;
+    }
+     */
 
     receive() external payable {}
 

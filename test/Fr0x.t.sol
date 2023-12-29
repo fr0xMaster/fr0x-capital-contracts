@@ -3,7 +3,7 @@
 /* solhint-disable func-name-mixedcase */
 /* solhint-disable  private-vars-leading-underscore */
 
-pragma solidity 0.8.20;
+pragma solidity 0.8.19;
 
 import {IUniswapV2Pair} from "@uniswap-core/contracts/interfaces/IUniswapV2Pair.sol";
 import {IUniswapV2Router02} from "@uniswap-periphery/contracts/interfaces/IUniswapV2Router02.sol";
@@ -27,15 +27,6 @@ contract Fr0xTest is Test {
 
     uint256 public TODAY = 1703462400;
     address public wftmToken = 0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83;
-
-    //FLOW
-    //0 - Create wallet for devmarketing and treasruy on ledger
-    //1 - Add 1010 FTM to deployer address sur metamask
-    //2 - Deploy Contract with deployer et en parametre
-    //3 - Trigger openTrading Function avec msg.value de 1000FTM et address de la ledger en param
-    //3-5 - Achete max 2.5% du supply avec le wallet a stella et avec ma ledger
-    //5 - Lock LP token avec la Ledger pendant 1 an sur Team.finance
-    //6 - Renouce Ownership avec Deployer
 
     function setUp() public {
         string memory FANTOM_RPC_URL = vm.envString("FANTOM_RPC_URL");
@@ -67,19 +58,21 @@ contract Fr0xTest is Test {
         assertEq(fr0x.feeSwapThreshold(), (fr0x.totalSupply() * 5) / 10000); // 0.05%
     }
 
-    function test_revert_OpenTradingButLessThan1000FTMOnContract() public {
+    function test_revert_OpenTradingButLessThan2000FTMOnContract() public {
         vm.expectRevert("Need 2000 FTM to Open Trading");
         fr0x.openTrading(myLedger);
     }
 
     function test_Check_OpenTrading() public {
-        fr0x.openTrading{value: 2000 ether}(myLedger);
+        payable(address(fr0x)).transfer(2000 ether);
+        fr0x.openTrading(myLedger);
         assertEq(fr0x.tradingEnabled(), true);
         assertGe(IERC20(fr0x.uniswapV2Pair()).totalSupply(), IERC20(fr0x.uniswapV2Pair()).balanceOf(myLedger));
     }
 
     function test_Check_SwapTriggerFees() public {
-        fr0x.openTrading{value: 2000 ether}(myLedger);
+        payable(address(fr0x)).transfer(2000 ether);
+        fr0x.openTrading(myLedger);
         vm.stopPrank();
         vm.startPrank(alice);
         uint256 aliceBalanceBefore = fr0x.balanceOf(alice);
@@ -101,7 +94,8 @@ contract Fr0xTest is Test {
     }
 
     function test_Check_SwapBackAlsoTriggerFees() public {
-        fr0x.openTrading{value: 2000 ether}(myLedger);
+        payable(address(fr0x)).transfer(2000 ether);
+        fr0x.openTrading(myLedger);
         vm.stopPrank();
         vm.startPrank(alice);
         // make the swap
@@ -132,8 +126,9 @@ contract Fr0xTest is Test {
     }
 
     function test_Check_NoLimitsAfter48Hours() public {
-        fr0x.openTrading{value: 2000 ether}(myLedger);
-        vm.warp(TODAY + 2 days + 1);
+        payable(address(fr0x)).transfer(2000 ether);
+        fr0x.openTrading(myLedger);
+        vm.warp(TODAY + 4 hours);
         vm.stopPrank();
         vm.startPrank(alice);
         address[] memory path = new address[](2);
@@ -146,7 +141,8 @@ contract Fr0xTest is Test {
     }
 
     function test_Check_TransferBetweenTwoWalletsDontTriggerFees() public {
-        fr0x.openTrading{value: 2000 ether}(myLedger);
+        payable(address(fr0x)).transfer(2000 ether);
+        fr0x.openTrading(myLedger);
         vm.stopPrank();
         vm.startPrank(alice);
         uint256 aliceBalanceBefore = fr0x.balanceOf(alice);
@@ -171,7 +167,8 @@ contract Fr0xTest is Test {
     }
 
     function test_Check_SwapThreesoldTriggerSentToTreasuryAndMarketingDevWallet() public {
-        fr0x.openTrading{value: 2000 ether}(myLedger);
+        payable(address(fr0x)).transfer(2000 ether);
+        fr0x.openTrading(myLedger);
         vm.stopPrank();
         vm.startPrank(alice);
         uint256 aliceBalanceBeforeFirstSwap = fr0x.balanceOf(alice);
