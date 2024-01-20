@@ -85,8 +85,8 @@ contract Fr0x is ERC20, Ownable {
 
     constructor(address _treasury, address _marketingDev) ERC20("fr0xCapital", "fr0x") {
         uniswapV2Router = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29); //SpookySwap Router
-        tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 300); // 1%
-        walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 300); // 1%
+        tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 300); // 3%
+        walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 300); // 3%
         feeSwapThreshold = _applyBasisPoints(TOTAL_SUPPLY, 5); // 0.05%
 
         TREASURY = _treasury;

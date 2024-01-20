@@ -13,7 +13,6 @@ import "forge-std/Test.sol";
 import "../src/Fr0x.sol";
 
 contract Fr0xTest is Test {
-/*
     uint256 public fantomFork;
     Fr0x public fr0x;
 
@@ -38,15 +37,14 @@ contract Fr0xTest is Test {
         vm.deal(alice, 20_000 ether);
         vm.deal(bob, 20_000 ether);
         vm.deal(wojak, 20_000 ether);
-
         vm.startPrank(deployer);
         fr0x = new Fr0x(TREASURY, MARKETING_DEV);
-    }
-
-    function test_Check_SupplyIsOwnedByContract() public {
-        uint256 supply = fr0x.totalSupply();
-        assertEq(supply, fr0x.TOTAL_SUPPLY());
-        assertEq(supply, fr0x.balanceOf(address(fr0x)));
+        fr0x.approve(address(fr0x.uniswapV2Router()), type(uint256).max);
+        fr0x.uniswapV2Router().addLiquidityETH{value: 2000 ether}(
+            address(fr0x), fr0x.balanceOf(deployer), 0, 0, deployer, block.timestamp
+        );
+        vm.stopPrank();
+        vm.startPrank(alice);
     }
 
     function test_Check_OwnerIsDeployerAtCreation() public {
@@ -54,37 +52,24 @@ contract Fr0xTest is Test {
     }
 
     function test_Check_LimtsAndThreeSold() public {
-        assertEq(fr0x.tradeLimit(), (fr0x.totalSupply() * 10) / 1000); // 1%
-        assertEq(fr0x.walletLimit(), (fr0x.totalSupply() * 10) / 1000); // 1%
+        assertEq(fr0x.tradeLimit(), (fr0x.totalSupply() * 30) / 1000); // 3%
+        assertEq(fr0x.walletLimit(), (fr0x.totalSupply() * 30) / 1000); // 3%
         assertEq(fr0x.feeSwapThreshold(), (fr0x.totalSupply() * 5) / 10000); // 0.05%
     }
 
-    function test_revert_OpenTradingButLessThan2000FTMOnContract() public {
-        vm.expectRevert("Need 2000 FTM to Open Trading");
-        fr0x.openTrading();
-    }
-
     function test_Check_OpenTrading() public {
-        payable(address(fr0x)).transfer(2000 ether);
-        fr0x.openTrading();
-        assertEq(fr0x.tradingEnabled(), true);
         assertGe(IERC20(fr0x.uniswapV2Pair()).totalSupply(), IERC20(fr0x.uniswapV2Pair()).balanceOf(deployer));
     }
 
     function test_Check_SwapTriggerFees() public {
-        payable(address(fr0x)).transfer(2000 ether);
-        fr0x.openTrading();
-        vm.stopPrank();
-        vm.startPrank(alice);
         uint256 aliceBalanceBefore = fr0x.balanceOf(alice);
         uint256 contractBalanceBefore = fr0x.balanceOf(address(fr0x));
         assertEq(aliceBalanceBefore, 0);
         assertEq(contractBalanceBefore, 0);
-
+        // make the swap
         address[] memory path = new address[](2);
         path[0] = wftmToken;
         path[1] = address(fr0x);
-        // make the swap
         IUniswapV2Router02(fr0x.uniswapV2Router()).swapExactETHForTokensSupportingFeeOnTransferTokens{value: 20 ether}(
             20 ether, path, alice, block.timestamp
         );
@@ -95,10 +80,6 @@ contract Fr0xTest is Test {
     }
 
     function test_Check_SwapBackAlsoTriggerFees() public {
-        payable(address(fr0x)).transfer(2000 ether);
-        fr0x.openTrading();
-        vm.stopPrank();
-        vm.startPrank(alice);
         // make the swap
         address[] memory path = new address[](2);
         path[0] = wftmToken;
@@ -126,10 +107,10 @@ contract Fr0xTest is Test {
         assertGt(contractBalanceAfterSwapBack, contractBalanceAfterFirstSwap);
     }
 
-    function test_Check_NoLimitsAfter48Hours() public {
-        payable(address(fr0x)).transfer(2000 ether);
-        fr0x.openTrading();
-        vm.warp(TODAY + 4 hours);
+    function test_Check_NoLimitsAfterRemoved() public {
+        vm.stopPrank();
+        vm.startPrank(deployer);
+        fr0x.removeLimits();
         vm.stopPrank();
         vm.startPrank(alice);
         address[] memory path = new address[](2);
@@ -142,10 +123,6 @@ contract Fr0xTest is Test {
     }
 
     function test_Check_TransferBetweenTwoWalletsDontTriggerFees() public {
-        payable(address(fr0x)).transfer(2000 ether);
-        fr0x.openTrading();
-        vm.stopPrank();
-        vm.startPrank(alice);
         uint256 aliceBalanceBefore = fr0x.balanceOf(alice);
         assertEq(aliceBalanceBefore, 0);
         address[] memory path = new address[](2);
@@ -159,7 +136,6 @@ contract Fr0xTest is Test {
         uint256 bobBalanceBeforeTransfer = fr0x.balanceOf(bob);
         assertGt(aliceBalanceAfter, aliceBalanceBefore);
         assertEq(bobBalanceBeforeTransfer, 0);
-
         fr0x.transfer(bob, aliceBalanceAfter);
         uint256 bobBalanceAfterTransfer = fr0x.balanceOf(bob);
         uint256 aliceBalanceAfterTransfer = fr0x.balanceOf(alice);
@@ -168,10 +144,6 @@ contract Fr0xTest is Test {
     }
 
     function test_Check_SwapThreesoldTriggerSentToTreasuryAndMarketingDevWallet() public {
-        payable(address(fr0x)).transfer(2000 ether);
-        fr0x.openTrading();
-        vm.stopPrank();
-        vm.startPrank(alice);
         uint256 aliceBalanceBeforeFirstSwap = fr0x.balanceOf(alice);
         uint256 contractBalanceBeforeFirstSwap = fr0x.balanceOf(address(fr0x));
         uint256 treasuryBalanceBeforeFirstSwap = fr0x.balanceOf(TREASURY);
@@ -251,10 +223,8 @@ contract Fr0xTest is Test {
         assertEq(aliceBalanceAfterFourthSwap, 0);
         uint256 contractBalanceAfterFourthSwap = fr0x.balanceOf(address(fr0x));
         assertEq(contractBalanceAfterFourthSwap, 0);
-
         assertGt(MARKETING_DEV.balance, 0);
         assertGt(TREASURY.balance, 0);
         assertGt(TREASURY.balance, MARKETING_DEV.balance);
     }
-     */
 }
