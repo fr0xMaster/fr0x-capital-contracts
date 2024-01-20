@@ -58,7 +58,7 @@ import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {IUniswapV2Factory} from "@uniswap-core/contracts/interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "@uniswap-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
-contract Fr0x is ERC20, Ownable {
+contract FTest is ERC20, Ownable {
     uint256 public constant TOTAL_SUPPLY = 10_000_000_000 * 1e18;
 
     IUniswapV2Router02 public immutable uniswapV2Router;
@@ -83,10 +83,10 @@ contract Fr0x is ERC20, Ownable {
     error TradeLimitExceeded();
     error WalletLimitExceeded();
 
-    constructor(address _treasury, address _marketingDev) ERC20("fr0xCapital", "fr0x") {
+    constructor(address _treasury, address _marketingDev) ERC20("FTEST", "FTest") {
         uniswapV2Router = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29); //SpookySwap Router
-        tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 300); // 1%
-        walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 300); // 1%
+        tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 300); // 3%
+        walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 300); // 3%
         feeSwapThreshold = _applyBasisPoints(TOTAL_SUPPLY, 5); // 0.05%
 
         TREASURY = _treasury;
@@ -123,7 +123,7 @@ contract Fr0x is ERC20, Ownable {
         super._transfer(from, to, finalAmount);
     }
 
-    function _handleLimits(address from, address to, uint256 amount) internal view {
+    function _handleLimits(address from, address to, uint256 amount) internal {
         if (!limitsEnabled || _isSwapping || from == owner() || to == owner()) {
             return;
         }

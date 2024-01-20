@@ -10,12 +10,15 @@ import {IUniswapV2Router02} from "@uniswap-periphery/contracts/interfaces/IUnisw
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "forge-std/Test.sol";
-import "../src/Fr0x.sol";
+import "../src/FTest.sol";
 
 contract Fr0xTest is Test {
 /*
+    
     uint256 public fantomFork;
-    Fr0x public fr0x;
+    FTest public fr0x;
+
+    address public uniswapV2Pair;
 
     // GLOBAL
     address public TREASURY = makeAddr("TREASURY");
@@ -40,14 +43,19 @@ contract Fr0xTest is Test {
         vm.deal(wojak, 20_000 ether);
 
         vm.startPrank(deployer);
-        fr0x = new Fr0x(TREASURY, MARKETING_DEV);
+        fr0x = new FTest(TREASURY, MARKETING_DEV);
+
+        IUniswapV2Router02(fr0x.uniswapV2Router()).addLiquidityETH{value: 2000 ether}(
+            address(fr0x), fr0x.balanceOf(deployer), 0, 0, deployer, block.timestamp
+        );
     }
 
     function test_Check_SupplyIsOwnedByContract() public {
         uint256 supply = fr0x.totalSupply();
         assertEq(supply, fr0x.TOTAL_SUPPLY());
-        assertEq(supply, fr0x.balanceOf(address(fr0x)));
+        assertEq(supply, fr0x.balanceOf(address(deployer)));
     }
+
 
     function test_Check_OwnerIsDeployerAtCreation() public {
         assertEq(fr0x.owner(), deployer);
@@ -58,18 +66,7 @@ contract Fr0xTest is Test {
         assertEq(fr0x.walletLimit(), (fr0x.totalSupply() * 10) / 1000); // 1%
         assertEq(fr0x.feeSwapThreshold(), (fr0x.totalSupply() * 5) / 10000); // 0.05%
     }
-
-    function test_revert_OpenTradingButLessThan2000FTMOnContract() public {
-        vm.expectRevert("Need 2000 FTM to Open Trading");
-        fr0x.openTrading();
-    }
-
-    function test_Check_OpenTrading() public {
-        payable(address(fr0x)).transfer(2000 ether);
-        fr0x.openTrading();
-        assertEq(fr0x.tradingEnabled(), true);
-        assertGe(IERC20(fr0x.uniswapV2Pair()).totalSupply(), IERC20(fr0x.uniswapV2Pair()).balanceOf(deployer));
-    }
+   
 
     function test_Check_SwapTriggerFees() public {
         payable(address(fr0x)).transfer(2000 ether);
@@ -256,5 +253,5 @@ contract Fr0xTest is Test {
         assertGt(TREASURY.balance, 0);
         assertGt(TREASURY.balance, MARKETING_DEV.balance);
     }
-     */
+    */
 }
