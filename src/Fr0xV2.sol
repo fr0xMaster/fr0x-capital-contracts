@@ -57,52 +57,75 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {IUniswapV2Factory} from "@uniswap-core/contracts/interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "@uniswap-periphery/contracts/interfaces/IUniswapV2Router02.sol";
+import {IEqualizerFactory} from "./interfaces/IEqualizerFactory.sol";
+import {IEqualizerRouterV3} from "./interfaces/IEqualizerRouterV3.sol";
 
-contract FTest is ERC20, Ownable {
+contract Fr0xV2 is ERC20, Ownable {
     uint256 public constant TOTAL_SUPPLY = 10_000_000_000 * 1e18;
 
     IUniswapV2Router02 public immutable uniswapV2Router;
+    IEqualizerRouterV3 public immutable equalizerRouterV3;
     address public uniswapV2Pair;
-    uint256 public tradeLimit;
-    uint256 public walletLimit;
-    uint256 public feeSwapThreshold;
-    bool public limitsEnabled = true;
+    address public equalizerV3Pair;
 
+    uint256 public feeSwapThreshold;
     uint256 public SELL_FEE = 500; // 5%
     uint256 public BUY_FEE = 500; // 5%
 
     address public TREASURY;
-    address public MARKETING_DEV;
+    address public DEVELOPMENT;
+    address public MIGRATION;
+
     bool private _isSwapping;
 
     mapping(address => bool) public pools;
-    mapping(address => bool) internal _exemptFromLimits;
     mapping(address => bool) internal _exemptFromFees;
 
     error CannotRemoveDefaultPair();
-    error TradeLimitExceeded();
-    error WalletLimitExceeded();
+    error MaxFees();
 
-    constructor(address _treasury, address _marketingDev) ERC20("FTEST", "FTest") {
+    struct Route {
+        address from;
+        address to;
+        bool stable;
+    }
+
+    //TODO: Need to mint total supply and transfer at migration contract.
+    //TODO: Need to add setter to add pool in pools
+    //TODO: Need to add setter to add contract in _exemptFromFees
+    //TODO: Need to add setter to handle change fees
+    //TODO: Need to add setter to  change share of fees between TREASURY AND DEVELPMENT
+    //TODO: make it compatible for biridge to axellar or layer zero
+    /*
+       1 - Deploy Migration Contract with a function who wiat an address for fro0x v2 and a state to tell Migration is ready
+            - Migration contract can be trigger via this function if v2 is deployed and hava an address & Migration balance of v2 Token is TOTAL SUPPLY
+       2 - Deploy FroxV2 with the address of Migration Contract and transfer TOTAL SUpply to V2
+     */
+
+    constructor(address _treasury, address _development, address _migration) ERC20("fr0xCapital", "fr0x") {
         uniswapV2Router = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29); //SpookySwap Router
-        tradeLimit = _applyBasisPoints(TOTAL_SUPPLY, 300); // 3%
-        walletLimit = _applyBasisPoints(TOTAL_SUPPLY, 300); // 3%
+        equalizerRouterV3 = IEqualizerRouterV3(0x33da53f731458d6Bc970B0C5FCBB0b3Db4AAa470); //Equalizer Router
         feeSwapThreshold = _applyBasisPoints(TOTAL_SUPPLY, 5); // 0.05%
 
         TREASURY = _treasury;
-        MARKETING_DEV = _marketingDev;
+        DEVELOPMENT = _development;
 
-        _exemptFromLimits[address(uniswapV2Router)] = true;
-        _exemptFromLimits[owner()] = true;
-        _exemptFromLimits[address(this)] = true;
         _exemptFromFees[owner()] = true;
         _exemptFromFees[address(this)] = true;
-        _mint(owner(), TOTAL_SUPPLY);
+        _exemptFromFees[TREASURY] = true;
+        _exemptFromFees[DEVELOPMENT] = true;
+
+        _mint(_migration, TOTAL_SUPPLY);
         _approve(address(this), address(uniswapV2Router), TOTAL_SUPPLY);
+
         uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory()).createPair(address(this), uniswapV2Router.WETH());
         IERC20(uniswapV2Pair).approve(address(uniswapV2Router), type(uint256).max);
         pools[address(uniswapV2Pair)] = true;
-        _exemptFromLimits[address(uniswapV2Pair)] = true;
+
+        equalizerV3Pair =
+            IEqualizerFactory(equalizerRouterV3.factory()).createPair(address(this), equalizerRouterV3.weth(), false);
+        IERC20(equalizerV3Pair).approve(address(equalizerRouterV3), type(uint256).max);
+        pools[address(equalizerV3Pair)] = true;
     }
 
     receive() external payable {}
@@ -116,34 +139,10 @@ contract FTest is ERC20, Ownable {
             return;
         }
 
-        _handleLimits(from, to, amount);
         uint256 finalAmount = _chargeFees(from, to, amount);
         _handleFeeSwap(from, to);
 
         super._transfer(from, to, finalAmount);
-    }
-
-    function _handleLimits(address from, address to, uint256 amount) internal {
-        if (!limitsEnabled || _isSwapping || from == owner() || to == owner()) {
-            return;
-        }
-        _applyLimits(from, to, amount);
-    }
-
-    function _applyLimits(address from, address to, uint256 amount) internal view {
-        // buy
-        if (pools[from] && !_exemptFromLimits[to]) {
-            if (amount > tradeLimit) revert TradeLimitExceeded();
-            if (amount + balanceOf(to) > walletLimit) revert WalletLimitExceeded();
-        }
-        // sell
-        else if (pools[to] && !_exemptFromLimits[from]) {
-            if (amount > tradeLimit) revert TradeLimitExceeded();
-        }
-        // transfer
-        else if (!_exemptFromLimits[to]) {
-            if (amount + balanceOf(to) > walletLimit) revert WalletLimitExceeded();
-        }
     }
 
     function _chargeFees(address from, address to, uint256 amount) internal returns (uint256) {
@@ -190,16 +189,16 @@ contract FTest is ERC20, Ownable {
         _swapTokensForEth(contractBalance);
 
         uint256 feesForTreasury = _applyBasisPoints(address(this).balance, 7500); //75%
-        uint256 feesForMarketingDev = address(this).balance - feesForTreasury; //25%
+        uint256 feesForDevelopment = address(this).balance - feesForTreasury; //25%
         (bool sentToTreasury,) = TREASURY.call{value: feesForTreasury}("");
         require(sentToTreasury, "sent to treasury failed");
-        (bool sentToMarketingDev,) = MARKETING_DEV.call{value: feesForMarketingDev}("");
+        (bool sentToMarketingDev,) = DEVELOPMENT.call{value: feesForDevelopment}("");
         require(sentToMarketingDev, "sent to Marketing/dev failed");
     }
 
-    function setMarketingWallet(address _newMarketingDev) external {
-        require(msg.sender == MARKETING_DEV, "Not authorized");
-        MARKETING_DEV = _newMarketingDev;
+    function setMarketingWallet(address _development) external {
+        require(msg.sender == TREASURY, "Not authorized");
+        DEVELOPMENT = _development;
     }
 
     function setTreasury(address _newTreasury) external {
@@ -215,10 +214,6 @@ contract FTest is ERC20, Ownable {
 
     function _applyBasisPoints(uint256 amount, uint256 basisPoints) internal pure returns (uint256) {
         return (amount * basisPoints) / 10_000;
-    }
-
-    function removeLimits() external onlyOwner {
-        limitsEnabled = false;
     }
 
     function _swapTokensForEth(uint256 tokenAmount) private {

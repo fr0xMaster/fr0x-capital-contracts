@@ -16,7 +16,6 @@ contract Fr0xTest is Test {
     uint256 public fantomFork;
     Fr0x public fr0x;
 
-    // GLOBAL
     address public TREASURY = makeAddr("TREASURY");
     address public MARKETING_DEV = makeAddr("MARKETING_DEV");
     address public deployer = 0x15cB5F1463467289028949bCca68C246f4295c15;
