@@ -3,7 +3,7 @@
 /* solhint-disable func-name-mixedcase */
 /* solhint-disable  private-vars-leading-underscore */
 
-pragma solidity 0.8.19;
+pragma solidity >=0.8.19;
 
 import {IUniswapV2Pair} from "@uniswap-core/contracts/interfaces/IUniswapV2Pair.sol";
 import {IUniswapV2Router02} from "@uniswap-periphery/contracts/interfaces/IUniswapV2Router02.sol";

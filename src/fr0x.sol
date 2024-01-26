@@ -2,7 +2,7 @@
 /* solhint-disable var-name-mixedcase */
 /* solhint-disable func-name-mixedcase */
 /* solhint-disable  private-vars-leading-underscore */
-pragma solidity 0.8.19;
+pragma solidity >=0.8.19;
 
 /**
  * fr0x Capital ($fr0x)
