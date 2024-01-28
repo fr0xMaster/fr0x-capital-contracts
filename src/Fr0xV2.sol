@@ -51,15 +51,16 @@ pragma solidity 0.8.20;
  * ................................''''''.........................'''''''..............................
  * ....................................................................................................
  */
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {OFT} from "@layer-zero/oapp/contracts/oft/OFT.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {IUniswapV2Factory} from "@uniswap-core/contracts/interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "@uniswap-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import {IEqualizerFactory} from "./interfaces/IEqualizerFactory.sol";
 import {IEqualizerRouterV3} from "./interfaces/IEqualizerRouterV3.sol";
 
-contract Fr0xV2 is OFT {
+contract Fr0xV2 is ERC20, Ownable {
     uint256 public constant TOTAL_SUPPLY = 10_000_000_000 * 1e18;
 
     IUniswapV2Router02 public immutable uniswapV2Router;
@@ -97,8 +98,9 @@ contract Fr0xV2 is OFT {
     //TODO: Need to add setter to change fees => DONE
     //TODO: Need to add setter to change share of fees (treasury vs dev) => DONE
     //TODO: ADD a state and a setter to know where to make the swap of fees (spooky, equalizer or manually) => DONE
+    //TODO: Remove LayerZero => DONE
 
-    //TODO: make it compatible for layer zero
+    //TODO: make it compatible for Axella
 
     /*
        1 - Deploy Migration Contract with a function who wiat an address for fro0x v2 and a state to tell Migration is ready
@@ -117,9 +119,7 @@ contract Fr0xV2 is OFT {
         _mint(_msgSender(), 100 * 10 * decimals()); // mints 100 tokens to the deployer
     }
      */
-    constructor(address _treasury, address _development, address _migration)
-        OFT("fr0xCapital", "fr0x", layerZeroFantomEndpoint, owner())
-    {
+    constructor(address _treasury, address _development, address _migration) ERC20("fr0xCapital", "fr0x") {
         uniswapV2Router = IUniswapV2Router02(0xF491e7B69E4244ad4002BC14e878a34207E38c29); //SpookySwap Router
         equalizerRouterV3 = IEqualizerRouterV3(0x33da53f731458d6Bc970B0C5FCBB0b3Db4AAa470); //Equalizer Router
         feeSwapThreshold = _applyBasisPoints(TOTAL_SUPPLY, 5); // 0.05%
